@@ -104,9 +104,9 @@ fn main() -> bitcoincore_rpc::Result<()> {
 
     // Mine new blocks to address in miner wallet
     if miner_rpc.get_balance(None, None).unwrap() == Amount::ZERO {
-        for i in 1..=100 {
+        for i in 0..2 {
             miner_rpc
-                .generate_to_address(1, &miner_address.clone().assume_checked())
+                .generate_to_address(100, &miner_address.clone().assume_checked())
                 .unwrap();
             let balance = miner_rpc.get_balance(None, None).unwrap();
             println!("After {} blocks: Balance = {}", i * 1, balance);
