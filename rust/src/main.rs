@@ -1,7 +1,8 @@
 #![allow(unused)]
 use bitcoin::hex::DisplayHex;
+use bitcoin::psbt::raw;
 use bitcoin::Address;
-use bitcoincore_rpc::bitcoin::Amount;
+use bitcoincore_rpc::bitcoin::{Amount, Network};
 use bitcoincore_rpc::{Auth, Client, RpcApi};
 use serde::Deserialize;
 use serde_json::json;
@@ -48,7 +49,7 @@ fn main() -> bitcoincore_rpc::Result<()> {
     println!("Blockchain Info: {:?}", blockchain_info);
 
     // Create/Load the wallets, named 'Miner' and 'Trader'.
-    let wallets = ["Minerz", "Traderz"];
+    let wallets = ["Miner", "Trader"];
     let loaded_wallets = rpc.list_wallets().unwrap();
 
     // Iterate through wallets array
@@ -153,27 +154,71 @@ fn main() -> bitcoincore_rpc::Result<()> {
         )
         .unwrap();
     println!("TxId: {:?}", txid);
-
+    
     // Check transaction in mempool
     let mempool_data = miner_rpc.get_mempool_entry(&txid).unwrap();
     println!("Mempool Tx Data{:?}", mempool_data);
-
+    
     // Mine 1 block to confirm the transaction
     miner_rpc
-        .generate_to_address(1, &miner_address.clone().assume_checked())
-        .unwrap();
+    .generate_to_address(1, &miner_address.clone().assume_checked())
+    .unwrap();
     println!(
         "Total trader wallet balance: {}",
         trader_rpc.get_balance(None, None).unwrap()
     );
 
-    // Extract all required transaction details
+    // Obtain all required transaction details and get raw transaction
     let tx_details = miner_rpc.get_transaction(&txid, None).unwrap();
     let transaction_id = tx_details.info.txid;
-
     let raw_tx = miner_rpc.get_raw_transaction(&txid, None).unwrap();
-    
-    // Write the data to ../out.txt in the specified format given in readme.md
+
+    // Extract miner's input address and amount from the first input's previous output
+    let first_input = &raw_tx.input[0];
+    let prev_tx = miner_rpc.get_raw_transaction(&first_input.previous_output.txid, None).unwrap();
+    let prev_output = &prev_tx.output[first_input.previous_output.vout as usize];
+    let miner_input_amount = prev_output.value;
+
+    // Get miner's input address by decoding the script of previous output
+    let miner_input_address = match bitcoin::Address::from_script(&prev_output.script_pubkey, bitcoin::Network::Regtest) {
+        Ok(addr) => addr.to_string(),
+        Err(_) => "Unable to decode".to_string(),
+    };
+
+    // Scan for miner change details and trader output details
+    let mut trader_output_amount = Amount::ZERO;
+    let trader_address_str = trader_address.assume_checked().to_string();
+    let mut miner_change_address = String::new();
+    let mut miner_change_amount = Amount::ZERO;
+
+    for output in &raw_tx.output {
+        if let Ok(addr) = bitcoin::Address::from_script(&output.script_pubkey, Network::Regtest) {
+            if addr.to_string() == trader_address_str {
+                trader_output_amount = output.value;
+            } else {
+                miner_change_address = addr.to_string();
+                miner_change_amount = output.value;
+            }
+        }
+    }
+
+    // Store other transaction details
+    let transaction_fees = tx_details.fee.unwrap();
+    let block_height = tx_details.info.blockheight.unwrap();
+    let block_hash = tx_details.info.blockhash.unwrap();
+
+    // Write the data to ../out.txt in the specified format given in readme.me
+    let mut file = File::create("../out.txt")?;
+    writeln!(file, "{}", transaction_id)?;
+    writeln!(file, "{}", miner_input_address)?;
+    writeln!(file, "{}", miner_input_amount.to_btc())?;
+    writeln!(file, "{}", trader_address_str)?;
+    writeln!(file, "{}", trader_output_amount.to_btc())?;
+    writeln!(file, "{}", miner_change_address)?;
+    writeln!(file, "{}", miner_change_amount.to_btc())?;
+    writeln!(file, "{}", transaction_fees.to_btc())?;
+    writeln!(file, "{:?}", block_height)?;
+    writeln!(file, "{:?}", block_hash)?;
 
     Ok(())
 }
