@@ -25,14 +25,6 @@ fn send(rpc: &Client, addr: &str) -> bitcoincore_rpc::Result<String> {
         json!(null),            // Empty option object
     ];
 
-    // let args = [json!({
-    //     "outputs": { addr: 100.0 }, // Send 100 BTC to the address
-    //     "conf_target": null,
-    //     "estimate_mode": null,
-    //     "fee_rate": null,
-    //     "options": {}
-    // })];
-
     #[derive(Deserialize)]
     struct SendResult {
         complete: bool,
@@ -53,10 +45,10 @@ fn main() -> bitcoincore_rpc::Result<()> {
 
     // Get blockchain info (RPC confirmation)
     let blockchain_info = rpc.get_blockchain_info()?;
-    println!("Blockchain Info: {:?}", blockchain_info); // <<<<<<<<<<<<
+    println!("Blockchain Info: {:?}", blockchain_info);
 
     // Create/Load the wallets, named 'Miner' and 'Trader'.
-    let wallets = ["Minera", "Tradera"];
+    let wallets = ["Minerz", "Traderz"];
     let loaded_wallets = rpc.list_wallets().unwrap();
 
     // Iterate through wallets array
@@ -85,7 +77,6 @@ fn main() -> bitcoincore_rpc::Result<()> {
             }
         }
     }
-
     println!("Loaded wallets: {:?}", rpc.list_wallets().unwrap());
 
     // Generate spendable balances in the Miner wallet.
@@ -124,7 +115,7 @@ fn main() -> bitcoincore_rpc::Result<()> {
         .generate_to_address(1, &miner_address.clone().assume_checked())
         .unwrap();
     println!(
-        "Total wallet balance: {}",
+        "Total miner wallet balance: {}",
         miner_rpc.get_balance(None, None).unwrap()
     );
 
@@ -133,30 +124,55 @@ fn main() -> bitcoincore_rpc::Result<()> {
      * Bitcoin block rewards (coinbase transactions) have a maturity period of 100 blocks before they become spendable.
      * This is a consensus rule designed to prevent issues if the blockchain reorganizes and coinbase transactions become invalid.
      *
-     * When you mine block 1, you get a 1250000000 SAT (12.5 BTC) reward, but it's "immature" and shows 0 spendable balance.
+     * When you mine block 1, you get a 625000000 SAT (6.25 BTC) reward, but it's "immature" and shows 0 spendable balance.
      * You need to mine 100 more blocks (blocks 2-101) before that first reward becomes mature.
      * At block 101, the reward from block 1 finally becomes spendable, showing a positive balance.
      *
      * This maturity ensures network security and prevents manipulation or double-spending of newly mined coins.
      */
 
-    // Load Trader wallet and generate a new address
+    // Create receiving address from Trader wallet
     let trader_rpc = Client::new(
         format!("{RPC_URL}/wallet/{}", wallets[1]).as_str(),
         Auth::UserPass(RPC_USER.to_owned(), RPC_PASS.to_owned()),
     )?;
-
-    // Create receiving address from Trader wallet
     let trader_address = trader_rpc.get_new_address(Some("Received"), None).unwrap();
 
     // Send 20 BTC from Miner to Trader
+    let amount = Amount::from_int_btc(20);
+    let txid = miner_rpc
+        .send_to_address(
+            &trader_address.clone().assume_checked(),
+            amount,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    println!("TxId: {:?}", txid);
 
     // Check transaction in mempool
+    let mempool_data = miner_rpc.get_mempool_entry(&txid).unwrap();
+    println!("Mempool Tx Data{:?}", mempool_data);
 
     // Mine 1 block to confirm the transaction
+    miner_rpc
+        .generate_to_address(1, &miner_address.clone().assume_checked())
+        .unwrap();
+    println!(
+        "Total trader wallet balance: {}",
+        trader_rpc.get_balance(None, None).unwrap()
+    );
 
     // Extract all required transaction details
+    let tx_details = miner_rpc.get_transaction(&txid, None).unwrap();
+    let transaction_id = tx_details.info.txid;
 
+    let raw_tx = miner_rpc.get_raw_transaction(&txid, None).unwrap();
+    
     // Write the data to ../out.txt in the specified format given in readme.md
 
     Ok(())
