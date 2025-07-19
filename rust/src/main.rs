@@ -46,7 +46,7 @@ fn main() -> bitcoincore_rpc::Result<()> {
 
     // Get blockchain info (RPC confirmation)
     let blockchain_info = rpc.get_blockchain_info()?;
-    println!("Blockchain Info: {:?}", blockchain_info);
+    println!("Blockchain Info: {blockchain_info:?}");
 
     // Create/Load the wallets, named 'Miner' and 'Trader'.
     let wallets = ["Miner", "Trader"];
@@ -56,7 +56,7 @@ fn main() -> bitcoincore_rpc::Result<()> {
     for wallet_name in wallets {
         // If wallet exists and is already loaded, continue through loop
         if loaded_wallets.contains(&wallet_name.to_string()) {
-            println!("Wallet '{}' is already loaded", wallet_name);
+            println!("Wallet '{wallet_name}' is already loaded");
             continue;
         } else {
             // Else if not loaded, try and load wallet via RPC call
@@ -71,7 +71,7 @@ fn main() -> bitcoincore_rpc::Result<()> {
                             println!("Wallet created: {:?}", wallet_create_result.name);
                         }
                         Err(error) => {
-                            println!("Wallet create error: {:?}", error);
+                            println!("Wallet create error: {error:?}");
                         }
                     }
                 }
@@ -109,7 +109,7 @@ fn main() -> bitcoincore_rpc::Result<()> {
                 .generate_to_address(100, &miner_address.clone().assume_checked())
                 .unwrap();
             let balance = miner_rpc.get_balance(None, None).unwrap();
-            println!("After {} blocks: Balance = {}", i, balance);
+            println!("After {i} blocks: Balance = {balance}");
         }
     }
     miner_rpc
@@ -153,11 +153,11 @@ fn main() -> bitcoincore_rpc::Result<()> {
             None,
         )
         .unwrap();
-    println!("TxId: {:?}", txid);
+    println!("TxId: {txid:?}");
 
     // Check transaction in mempool
     let mempool_data = miner_rpc.get_mempool_entry(&txid).unwrap();
-    println!("Mempool Tx Data{:?}", mempool_data);
+    println!("Mempool Tx Data{mempool_data:?}");
 
     // Mine 1 block to confirm the transaction
     miner_rpc
@@ -214,16 +214,16 @@ fn main() -> bitcoincore_rpc::Result<()> {
 
     // Write the data to ../out.txt in the specified format given in readme.me
     let mut file = File::create("../out.txt")?;
-    writeln!(file, "{}", transaction_id)?;
-    writeln!(file, "{}", miner_input_address)?;
+    writeln!(file, "{transaction_id}")?;
+    writeln!(file, "{miner_input_address}")?;
     writeln!(file, "{}", miner_input_amount.to_btc())?;
-    writeln!(file, "{}", trader_address_str)?;
+    writeln!(file, "{trader_address_str}")?;
     writeln!(file, "{}", trader_output_amount.to_btc())?;
-    writeln!(file, "{}", miner_change_address)?;
+    writeln!(file, "{miner_change_address}")?;
     writeln!(file, "{}", miner_change_amount.to_btc())?;
     writeln!(file, "{}", transaction_fees.to_btc())?;
-    writeln!(file, "{:?}", block_height)?;
-    writeln!(file, "{:?}", block_hash)?;
+    writeln!(file, "{block_height}")?;
+    writeln!(file, "{block_hash}")?;
 
     Ok(())
 }
