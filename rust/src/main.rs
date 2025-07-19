@@ -24,6 +24,14 @@ fn send(rpc: &Client, addr: &str) -> bitcoincore_rpc::Result<String> {
         json!(null),            // Empty option object
     ];
 
+    let args = [json!({
+        "outputs": { addr: 100.0 }, // Send 100 BTC to the address
+        "conf_target": null,
+        "estimate_mode": null,
+        "fee_rate": null,
+        "options": {}
+    })];
+
     #[derive(Deserialize)]
     struct SendResult {
         complete: bool,
@@ -45,7 +53,36 @@ fn main() -> bitcoincore_rpc::Result<()> {
     let blockchain_info = rpc.get_blockchain_info()?;
     println!("Blockchain Info: {:?}", blockchain_info);
 
-    // Create/Load the wallets, named 'Miner' and 'Trader'. Have logic to optionally create/load them if they do not exist or not loaded already.
+    // Create/Load the wallets, named 'Miner' and 'Trader'.
+    let wallets = ["Miner", "Trader"];
+    let loaded_wallets = rpc.list_wallets().unwrap();
+
+    // Iterate through wallets array
+    for wallet_name in wallets {
+        // If wallet exists and is already loaded, continue through loop
+        if loaded_wallets.contains(&wallet_name.to_string()) {
+            println!("Wallet '{}' is already loaded", wallet_name);
+            continue;
+        } else {
+            // Else if not loaded, try and load wallet via RPC call
+            match rpc.load_wallet(wallet_name) {
+                Ok(wallet_load_result) => {
+                    println!("Wallet loaded: {:?}", wallet_load_result.name);
+                }
+                Err(e) => {
+                    // Else, create wallet via RPC call
+                    match rpc.create_wallet(wallet_name, Some(false), Some(false), Some(""), Some(false)) {
+                        Ok(wallet_create_result) => {
+                            println!("Wallet created: {:?}", wallet_create_result.name);
+                        }
+                        Err(error) => {
+                            println!("Wallet create error: {:?}", error);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Generate spendable balances in the Miner wallet. How many blocks needs to be mined?
 
